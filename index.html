@@ -288,7 +288,7 @@
             fetchData(uid);
         } else {
             loader.style.display = 'none';
-            alert("QR найден, но UID запчасти не обнаружен. Вероятно, это неоригинальная запчасть.");
+            alert("QR найден, но UID запчасти не обнаружен. Вероятно, это неоригинальная запчасть или она не подлежит внесению в базу запчастей.");
         }
     }
 
@@ -332,7 +332,7 @@
         if (data && data.UID) {
             resultElem.classList.add('success');
             resultElem.innerHTML = `
-                <h2 style="margin:0 0 15px 0; text-align:center">Информация найдена</h2>
+                <h2 style="margin:0 0 15px 0; text-align:center">✅ Информация найдена</h2>
                 <div class="row"><span class="lbl">UID коробки</span><span class="val">${data.UID}</span></div>
                 <div class="row"><span class="lbl">Партномер</span><span class="val">${data.code||'-'}</span></div>
                 <div class="row"><span class="lbl">Китайское название</span><span class="val">${data.name||'-'}</span></div>
@@ -343,13 +343,14 @@
         } else {
             resultElem.classList.add('error');
             resultElem.innerHTML = `
-                <h2 style="margin:0; text-align:center">❌ Подделка / Не найдено</h2>
+                <h2 style="margin:0; text-align:center">❌ Подделка / не найдено в базе</h2>
                 <p style="text-align:center; font-size:14px; margin-top:10px">Сервер не подтвердил этот код для бренда ${brand}.</p>
                 <p style="text-align: center; color: #555; font-size: 14px;">Возможные причины:</p>
                 <ul style="font-size: 14px; color: #555;">
-                    <li>Это подделка.</li>
-                    <li>Выбран неверный бренд (попробуйте переключить на Zeekr/Lynk).</li>
-                    <li>Ошибка на сервере Geely.</li>
+                    <li>- это подделка</li>
+                    <li>- запчасть не подлежит маркировке/внесению в БД</li>
+                    <li>- выбран неверный бренд (попробуйте переключить на Zeekr/Lynk)</li>
+                    <li>- ошибка на сервере Geely</li>
                 </ul>
             `;
         }
