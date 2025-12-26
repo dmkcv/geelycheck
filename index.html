@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Сканер автозапчастей концерна Geely</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
     <style>
         :root {
             --primary: #0056b3;
-            --primary-hover: #004494;
-            --bg: #f4f4f9;
+            --bg: #f0f2f5;
             --card: #ffffff;
         }
         body {
@@ -20,15 +20,18 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
         }
         .container {
             width: 100%;
             max-width: 600px;
             background: var(--card);
             border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
             padding: 20px;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
         }
         h1 { margin: 0 0 20px 0; text-align: center; color: #333; font-size: 1.4rem; }
 
@@ -39,12 +42,13 @@
             border-radius: 8px;
             overflow: hidden;
             margin-bottom: 20px;
+            flex-shrink: 0;
         }
         .brand-option { flex: 1; position: relative; }
-        .brand-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .brand-option input { position: absolute; opacity: 0; }
         .brand-option label {
             display: block;
-            padding: 10px 0;
+            padding: 12px 0;
             text-align: center;
             background: #fff;
             color: var(--primary);
@@ -60,21 +64,35 @@
             color: white;
         }
 
-        /* Scanner Area */
-        #reader {
+        /* Video Area (Nimiq Scanner) */
+        .scanner-wrapper {
+            position: relative;
             width: 100%;
-            min-height: 300px;
+            height: 350px;
             background: #000;
             border-radius: 12px;
-            margin-bottom: 20px;
-            display: none; /* Скрыт по умолчанию */
-            position: relative;
             overflow: hidden;
+            margin-bottom: 20px;
+            display: none;
         }
-        #reader video { object-fit: cover; border-radius: 12px; width: 100% !important; height: 100% !important; }
+        .scanner-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px; height: 200px;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 10px;
+            box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+        }
 
-        /* Action Buttons */
-        .actions { display: flex; flex-direction: column; gap: 10px; }
+        /* Controls */
+        .controls { display: flex; flex-direction: column; gap: 10px; }
         
         .btn {
             border: none;
@@ -87,16 +105,22 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
-            transition: transform 0.1s;
+            transition: 0.1s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .btn:active { transform: scale(0.98); }
-        
         .btn-primary { background: var(--primary); color: white; }
         .btn-outline { background: white; border: 2px solid var(--primary); color: var(--primary); }
         .btn-stop { background: #dc3545; color: white; display: none; }
-
-        /* Hidden File Input */
-        #fileInput { display: none; }
+        
+        .btn-flash { 
+            position: absolute; bottom: 20px; right: 20px; 
+            background: rgba(255,255,255,0.3); 
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white; border-radius: 50%; 
+            width: 50px; height: 50px; font-size: 24px;
+            z-index: 10; display: none;
+        }
 
         /* Results */
         .result-card {
@@ -104,22 +128,17 @@
             padding: 20px;
             border-radius: 12px;
             display: none;
-            animation: slideUp 0.3s ease-out;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
 
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
-        .result-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        .result-row:last-child { border-bottom: none; }
-        .label { font-weight: bold; font-size: 0.9rem; opacity: 0.7; }
-        .value { font-weight: 500; text-align: right; }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .row:last-child { border-bottom: none; }
+        .lbl { font-weight: bold; opacity: 0.7; font-size: 0.9rem; }
+        .val { font-weight: 500; text-align: right; }
 
         .loader {
             display: none;
@@ -128,6 +147,8 @@
             margin: 20px 0;
             font-weight: bold;
         }
+        
+        #html5-qr-reader { display: none; }
     </style>
 </head>
 <body>
@@ -135,244 +156,195 @@
 <div class="container">
     <h1>Сканер автозапчастей концерна Geely</h1>
 
-    <!-- Выбор бренда -->
     <div class="brand-selector">
-        <div class="brand-option">
-            <input type="radio" name="brand" id="brand_geely" value="GEELY" checked>
-            <label for="brand_geely">Geely</label>
-        </div>
-        <div class="brand-option">
-            <input type="radio" name="brand" id="brand_zeekr" value="ZEEKR">
-            <label for="brand_zeekr">Zeekr</label>
-        </div>
-        <div class="brand-option">
-            <input type="radio" name="brand" id="brand_lynk" value="LYNKCO">
-            <label for="brand_lynk">Lynk</label>
-        </div>
-        <div class="brand-option">
-            <input type="radio" name="brand" id="brand_lining" value="LINING">
-            <label for="brand_lining">Lining</label>
-        </div>
+        <div class="brand-option"><input type="radio" name="brand" id="b_geely" value="GEELY" checked><label for="b_geely">Geely</label></div>
+        <div class="brand-option"><input type="radio" name="brand" id="b_zeekr" value="ZEEKR"><label for="b_zeekr">Zeekr</label></div>
+        <div class="brand-option"><input type="radio" name="brand" id="b_lynk" value="LYNKCO"><label for="b_lynk">Lynk</label></div>
+        <div class="brand-option"><input type="radio" name="brand" id="b_lining" value="LINING"><label for="b_lining">Lining</label></div>
     </div>
 
-    <!-- Область камеры -->
-    <div id="reader"></div>
-
-    <!-- Кнопки управления -->
-    <div class="actions" id="actionButtons">
-        <!-- Кнопка 1: Живая камера -->
-        <button class="btn btn-primary" onclick="startCamera()" id="btnStart">
-            <span>📷</span> Запустить камеру
-        </button>
-        
-        <!-- Кнопка стоп (скрыта) -->
-        <button class="btn btn-stop" onclick="stopCamera()" id="btnStop">
-            ⏹ Остановить сканирование
-        </button>
-
-        <!-- Кнопка 2: Файл/Нативное фото -->
-        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
-            <span>🖼️</span> Загрузить фото / Снять
-        </button>
-        
-        <!-- Скрытый инпут для файла -->
-        <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this)">
+    <!-- Область камеры (для Nimiq Scanner) -->
+    <div class="scanner-wrapper" id="scannerWrapper">
+        <video id="qr-video"></video>
+        <div class="scan-overlay"></div>
+        <button class="btn btn-flash" id="flashBtn" onclick="toggleFlash()">🔦</button>
     </div>
 
-    <div class="loader" id="loader">Запрос к серверу... ⏳</div>
+    <div id="html5-qr-reader"></div>
 
-    <!-- Блок результата -->
+    <div class="controls">
+        <button class="btn btn-primary" id="btnStart" onclick="startCamera()">Включить камеру</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopCamera()">Выключить</button>
+
+        <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">Загрузить фото</button>
+        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="scanFromFile(this)">
+        
+        <button class="btn btn-primary" id="btnReset" style="display:none" onclick="resetUI()">🔄 Проверить другую</button>
+    </div>
+
+    <div class="loader" id="loader">Идет проверка...</div>
     <div id="result" class="result-card"></div>
-    
-    <!-- Кнопка сброса (появляется после результата) -->
-    <button class="btn btn-primary" id="resetBtn" style="display:none; margin-top:15px;" onclick="resetAll()">
-        🔄 Проверить другую
-    </button>
 </div>
 
-<script>
-    let html5QrCode;
-    const readerElement = document.getElementById('reader');
-    const resultElement = document.getElementById('result');
-    const loader = document.getElementById('loader');
-    
-    // --- Управление сканером ---
+<script type="module">
+    import QrScanner from 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner.min.js';
+    QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
 
-    async function startCamera() {
-        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            alert("Внимание! Камера работает только по HTTPS. Попробуйте кнопку 'Загрузить фото' или откройте сайт через защищенное соединение.");
+    // Глобальные переменные
+    let nimiqScanner = null; // Для камеры
+    let html5FileScanner = null; // Для файлов
+    
+    const videoElem = document.getElementById('qr-video');
+    const wrapper = document.getElementById('scannerWrapper');
+    const resultElem = document.getElementById('result');
+    const loader = document.getElementById('loader');
+    const flashBtn = document.getElementById('flashBtn');
+
+    // === ЛОГИКА КАМЕРЫ (Nimiq) ===
+    window.startCamera = async () => {
+        // UI
+        resultElem.style.display = 'none';
+        document.getElementById('btnReset').style.display = 'none';
+        document.getElementById('btnStart').style.display = 'none';
+        wrapper.style.display = 'block';
+        document.getElementById('btnStop').style.display = 'flex';
+
+        if (!nimiqScanner) {
+            nimiqScanner = new QrScanner(
+                videoElem,
+                (result) => handleScanSuccess(result.data || result),
+                { highlightScanRegion: true, maxScansPerSecond: 5, preferredCamera: 'environment' }
+            );
         }
 
-        // Сброс UI
-        resultElement.style.display = 'none';
-        document.getElementById('resetBtn').style.display = 'none';
-        
         try {
-            if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("reader");
-            }
-            
-            readerElement.style.display = 'block';
-            document.getElementById('btnStart').style.display = 'none';
-            document.getElementById('btnStop').style.display = 'flex';
-
-            await html5QrCode.start(
-                { facingMode: "environment" }, // Задняя камера
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                (decodedText) => {
-                    // Успешный скан
-                    stopCamera();
-                    processCode(decodedText);
-                },
-                (errorMessage) => {
-                    // Ошибки сканирования кадров игнорируем
-                }
-            );
-        } catch (err) {
-            console.error(err);
-            alert("Не удалось запустить камеру. Попробуйте кнопку 'Загрузить фото'.\nОшибка: " + err);
+            await nimiqScanner.start();
+            if (await nimiqScanner.hasFlash()) flashBtn.style.display = 'flex';
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка камеры: " + e);
             stopCamera();
         }
-    }
+    };
 
-    async function stopCamera() {
-        if (html5QrCode && html5QrCode.isScanning) {
-            await html5QrCode.stop();
+    window.stopCamera = () => {
+        if (nimiqScanner) {
+            nimiqScanner.stop();
+            flashBtn.style.display = 'none';
         }
-        readerElement.style.display = 'none';
-        document.getElementById('btnStart').style.display = 'flex';
+        wrapper.style.display = 'none';
         document.getElementById('btnStop').style.display = 'none';
-    }
+        document.getElementById('btnStart').style.display = 'flex';
+    };
 
-    // --- Обработка файла (фоллбэк) ---
-    
-    async function handleFile(input) {
-        if (input.files.length === 0) return;
-        
+    window.toggleFlash = () => {
+        if(nimiqScanner) {
+            nimiqScanner.toggleFlash();
+            flashBtn.classList.toggle('active');
+        }
+    };
+
+    // === ЛОГИКА ФАЙЛА (Html5Qrcode) ===
+    window.scanFromFile = async (input) => {
+        if (!input.files.length) return;
         const file = input.files[0];
         
-        if (!html5QrCode) {
-            html5QrCode = new Html5Qrcode("reader");
-        }
-
+        stopCamera();
+        
         loader.style.display = 'block';
-        resultElement.style.display = 'none';
+        resultElem.style.display = 'none';
 
         try {
-            const decodedText = await html5QrCode.scanFile(file, true);
-            processCode(decodedText);
+            if (!html5FileScanner) {
+                html5FileScanner = new Html5Qrcode("html5-qr-reader", false);
+            }
+
+            const decodedText = await html5FileScanner.scanFile(file, true);
+            handleScanSuccess(decodedText);
+            
         } catch (err) {
             loader.style.display = 'none';
-            alert("Не удалось найти QR-код на изображении. Попробуйте сделать фото четче и ближе.");
+            console.error(err);
+            alert("QR-код на фото не найден. Попробуйте обрезать фото или сделать его четче.");
         }
+        input.value = ''; // Сброс инпута
+    };
+
+    // === ОБЩАЯ ЛОГИКА ===
+    
+    window.resetUI = () => {
+        resultElem.style.display = 'none';
+        document.getElementById('btnReset').style.display = 'none';
+        if(!/Mobi|Android/i.test(navigator.userAgent)) window.startCamera();
+    };
+
+    function handleScanSuccess(text) {
+        console.log("Decoded:", text);
+        // Останавливаем камеру при успехе
+        stopCamera();
         
-        input.value = '';
-    }
-
-    // --- Логика запросов ---
-
-    function resetAll() {
-        resultElement.style.display = 'none';
-        document.getElementById('resetBtn').style.display = 'none';
-    }
-
-    function processCode(text) {
-        console.log("Code:", text);
         const uid = extractUID(text);
-        
         if (uid) {
-            fetchSparesInfo(uid);
+            fetchData(uid);
         } else {
             loader.style.display = 'none';
-            alert("QR-код считан, но UID не найден. Это точно код запчасти?");
+            alert("QR найден, но UID запчасти не обнаружен. Вероятно, это неоригинальная запчасть.");
         }
     }
 
     function extractUID(text) {
         try {
-            const urlObj = new URL(text);
-            const uid = urlObj.searchParams.get("UID") || urlObj.searchParams.get("uid");
+            const url = new URL(text);
+            const uid = url.searchParams.get("UID") || url.searchParams.get("uid");
             if (uid) return uid;
         } catch (e) {}
-        const match = text.match(/[?&]UID=([^&]+)/i);
-        if (match) return match[1];
+        const m = text.match(/[?&]UID=([^&]+)/i);
+        if (m) return m[1];
         if (text.length > 10 && !text.includes(' ') && !text.includes('http')) return text;
         return null;
     }
 
-    async function fetchSparesInfo(uid) {
+    async function fetchData(uid) {
         const brand = document.querySelector('input[name="brand"]:checked').value;
         loader.style.display = 'block';
+        document.querySelector('.controls').style.display = 'none';
 
-        // URL API
         const baseUrl = "https://fangwei.geely.com/geelyServiceNew/domain/v1/wx/verify/spares";
-        let targetUrl = `${baseUrl}?code=${uid}&t=${Date.now()}`;
-        if (brand !== 'GEELY') targetUrl += `&brandCode=${brand}`;
+        let url = `${baseUrl}?code=${uid}&t=${Date.now()}`;
+        if (brand !== 'GEELY') url += `&brandCode=${brand}`;
 
         try {
-            const response = await fetch(targetUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json, text/plain, */*' }
-            });
-
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            
+            const res = await fetch(url, { headers: { 'Accept': 'application/json, text/plain, */*' } });
+            const data = await res.json();
+            renderResult(data, brand);
+        } catch (e) {
+            showError("Ошибка сети", e.message);
+        } finally {
             loader.style.display = 'none';
-            showResult(data, brand);
-            document.getElementById('resetBtn').style.display = 'flex';
-
-        } catch (error) {
-            console.error(error);
-            loader.style.display = 'none';
-            showError("Ошибка сети", error.message);
-            document.getElementById('resetBtn').style.display = 'flex';
+            document.querySelector('.controls').style.display = 'flex';
+            document.getElementById('btnStart').style.display = 'none';
+            document.getElementById('btnReset').style.display = 'flex';
         }
     }
 
-    function showResult(data, brand) {
-        resultElement.className = 'result-card';
-        
+    function renderResult(data, brand) {
+        resultElem.className = 'result-card';
         if (data && data.UID) {
-            // SUCCESS
-            resultElement.classList.add('success');
-            const titles = {
-                'GEELY': 'Geely Оригинал',
-                'ZEEKR': 'Zeekr Оригинал',
-                'LYNKCO': 'Lynk&Co Оригинал',
-                'LINING': 'Lining Оригинал'
-            };
-
-            resultElement.innerHTML = `
-                <h2 style="margin:0 0 15px 0; text-align: center;">✅ ${titles[brand]}</h2>
-                <div class="result-row">
-                    <span class="label">UID в QR-коде запчасти</span>
-                    <span class="value">${data.UID}</span>
-                </div>
-                <div class="result-row">
-                    <span class="label">Партномер</span>
-                    <span class="value">${data.code || '—'}</span>
-                </div>
-                <div class="result-row">
-                    <span class="label">Китайское название</span>
-                    <span class="value">${data.name || '—'}</span>
-                </div>
-                <div class="result-row">
-                    <span class="label">Английское название</span>
-                    <span class="value">${data.nameEn || '—'}</span>
-                </div>
-                <div class="result-row" style="flex-direction:column; gap:5px;">
-                    <span class="label">Прозводитель</span>
-                    <span class="value" style="text-align:left; font-size:14px;">${data.dealerName || '—'}</span>
-                </div>
+            resultElem.classList.add('success');
+            resultElem.innerHTML = `
+                <h2 style="margin:0 0 15px 0; text-align:center">Информация найдена</h2>
+                <div class="row"><span class="lbl">UID коробки</span><span class="val">${data.UID}</span></div>
+                <div class="row"><span class="lbl">Партномер</span><span class="val">${data.code||'-'}</span></div>
+                <div class="row"><span class="lbl">Китайское название</span><span class="val">${data.name||'-'}</span></div>
+                <div class="row"><span class="lbl">Английское название</span><span class="val">${data.nameEn||'-'}</span></div>
+                <div class="row" style="flex-direction:column"><span class="lbl">Производитель</span><span class="val" style="text-align:left; font-size:13px; margin-top:4px">${data.dealerName||'-'}</span></div>
                 <p style="text-align: center; font-size:14px;">Убедитесь, что название запчасти выше совпадает с тем, что вы реально сканировали.</p>
             `;
         } else {
-            // FAIL
-            resultElement.classList.add('error');
-            resultElement.innerHTML = `
-                <h2 style="margin-top:0; text-align: center;">❌ Внимание!</h2>
-                <p style="text-align: center; font-size:18px;">Данные о запчасти не найдены.</p>
+            resultElem.classList.add('error');
+            resultElem.innerHTML = `
+                <h2 style="margin:0; text-align:center">❌ Подделка / Не найдено</h2>
+                <p style="text-align:center; font-size:14px; margin-top:10px">Сервер не подтвердил этот код для бренда ${brand}.</p>
                 <p style="text-align: center; color: #555; font-size: 14px;">Возможные причины:</p>
                 <ul style="font-size: 14px; color: #555;">
                     <li>Это подделка.</li>
@@ -381,13 +353,13 @@
                 </ul>
             `;
         }
-        resultElement.style.display = 'block';
+        resultElem.style.display = 'block';
     }
 
     function showError(title, msg) {
-        resultElement.className = 'result-card error';
-        resultElement.innerHTML = `<h3>${title}</h3><p>${msg}</p>`;
-        resultElement.style.display = 'block';
+        resultElem.className = 'result-card error';
+        resultElem.innerHTML = `<h3>${title}</h3><p>${msg}</p>`;
+        resultElem.style.display = 'block';
     }
 </script>
 
