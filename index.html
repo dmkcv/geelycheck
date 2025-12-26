@@ -179,7 +179,7 @@
         <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">Загрузить фото</button>
         <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="scanFromFile(this)">
         
-        <button class="btn btn-primary" id="btnReset" style="display:none" onclick="resetUI()">🔄 Проверить другую</button>
+        <button class="btn btn-primary" id="btnReset" style="display:none" onclick="window.location.reload()">🔄 Проверить другую</button>
     </div>
 
     <div class="loader" id="loader">Идет проверка...</div>
