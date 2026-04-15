@@ -356,11 +356,11 @@
             let delay = 0;
             if (data.name && data.name !== '-') {
                 setTimeout(() => requestTranslation(data.name, 'name'), delay);
-                delay += 2000; // Пауза 2 сек для обхода лимита 1 QPS
+                delay += 3000;
             }
             if (data.desc && data.desc !== '-') {
                 setTimeout(() => requestTranslation(data.desc, 'desc'), delay);
-                delay += 2000;
+                delay += 3000;
             }
             if (data.dealerName && data.dealerName !== '-') {
                 setTimeout(() => requestTranslation(data.dealerName, 'dealer'), delay);
